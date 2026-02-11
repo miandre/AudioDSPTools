@@ -192,12 +192,10 @@ dsp::wav::LoadReturnCode ReadFmtChunk(std::ifstream& wavFile, WaveFileData& wfd,
   }
 
   wfd.fmtChunk.numChannels = ReadShort(wavFile);
-  // HACK
-  // Note for future: for multi-channel files, samples are laid out with channel in the inner loop.
-  if (wfd.fmtChunk.numChannels != 1)
+  if (wfd.fmtChunk.numChannels < 1)
   {
-    std::cerr << "Require mono (using for IR loading)" << std::endl;
-    return dsp::wav::LoadReturnCode::ERROR_NOT_MONO;
+    std::cerr << "Invalid channel count in WAV: " << wfd.fmtChunk.numChannels << std::endl;
+    return dsp::wav::LoadReturnCode::ERROR_INVALID_FILE;
   }
 
   wfd.fmtChunk.sampleRate = ReadInt(wavFile);
@@ -302,12 +300,13 @@ dsp::wav::LoadReturnCode ReadDataChunk(std::ifstream& wavFile, WaveFileData& wfd
 
   // Size of the data chunk, in bits.
   wfd.dataChunk.size = ReadInt(wavFile);
+  std::vector<float> loaded;
 
   const int audioFormat = GetAudioFormat(wfd);
   if (audioFormat == AUDIO_FORMAT_IEEE)
   {
     if (wfd.fmtChunk.bitsPerSample == 32)
-      dsp::wav::_LoadSamples32FloatingPoint(wavFile, wfd.dataChunk.size, audio);
+      dsp::wav::_LoadSamples32FloatingPoint(wavFile, wfd.dataChunk.size, loaded);
     else
     {
       std::cerr << "Error: Unsupported bits per sample for IEEE files: " << wfd.fmtChunk.bitsPerSample << std::endl;
@@ -317,11 +316,11 @@ dsp::wav::LoadReturnCode ReadDataChunk(std::ifstream& wavFile, WaveFileData& wfd
   else if (audioFormat == AUDIO_FORMAT_PCM)
   {
     if (wfd.fmtChunk.bitsPerSample == 16)
-      dsp::wav::_LoadSamples16(wavFile, wfd.dataChunk.size, audio);
+      dsp::wav::_LoadSamples16(wavFile, wfd.dataChunk.size, loaded);
     else if (wfd.fmtChunk.bitsPerSample == 24)
-      dsp::wav::_LoadSamples24(wavFile, wfd.dataChunk.size, audio);
+      dsp::wav::_LoadSamples24(wavFile, wfd.dataChunk.size, loaded);
     else if (wfd.fmtChunk.bitsPerSample == 32)
-      dsp::wav::_LoadSamples32FixedPoint(wavFile, wfd.dataChunk.size, audio);
+      dsp::wav::_LoadSamples32FixedPoint(wavFile, wfd.dataChunk.size, loaded);
     else
     {
       std::cerr << "Error: Unsupported bits per sample for PCM files: " << wfd.fmtChunk.bitsPerSample << std::endl;
@@ -332,6 +331,31 @@ dsp::wav::LoadReturnCode ReadDataChunk(std::ifstream& wavFile, WaveFileData& wfd
   {
     std::cerr << "Error: Unsupported audio format: " << audioFormat << std::endl;
     return dsp::wav::LoadReturnCode::ERROR_UNSUPPORTED_FORMAT_OTHER;
+  }
+
+  if (wfd.fmtChunk.numChannels == 1)
+  {
+    audio = std::move(loaded);
+  }
+  else
+  {
+    const size_t numChannels = (size_t)wfd.fmtChunk.numChannels;
+    if (numChannels == 0 || (loaded.size() % numChannels) != 0)
+    {
+      std::cerr << "Invalid interleaved sample data for channel count." << std::endl;
+      return dsp::wav::LoadReturnCode::ERROR_INVALID_FILE;
+    }
+    const size_t numFrames = loaded.size() / numChannels;
+    audio.assign(numFrames, 0.0f);
+    const float scale = 1.0f / (float)numChannels;
+    for (size_t frame = 0; frame < numFrames; ++frame)
+    {
+      float sum = 0.0f;
+      const size_t frameOffset = frame * numChannels;
+      for (size_t ch = 0; ch < numChannels; ++ch)
+        sum += loaded[frameOffset + ch];
+      audio[frame] = sum * scale;
+    }
   }
   wfd.dataChunk.valid = true;
   return dsp::wav::LoadReturnCode::SUCCESS;
