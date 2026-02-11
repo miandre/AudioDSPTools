@@ -207,6 +207,11 @@ dsp::wav::LoadReturnCode ReadFmtChunk(std::ifstream& wavFile, WaveFileData& wfd,
   if (wfd.fmtChunk.audioFormat == AUDIO_FORMAT_EXTENSIBLE)
   {
     unsigned short cbSize = ReadUnsignedShort(wavFile);
+    if (cbSize < 22)
+    {
+      std::cerr << "Error: Extensible fmt chunk too small (cbSize=" << cbSize << ")." << std::endl;
+      return dsp::wav::LoadReturnCode::ERROR_INVALID_FILE;
+    }
     // Do we need to assert or modify the data loading below if this doesn't match bitsPerSample?
     wfd.fmtChunk.extensible.validBitsPerSample = ReadUnsignedShort(wavFile);
     auto read_u32 = [&]() -> std::uint32_t {
@@ -222,15 +227,10 @@ dsp::wav::LoadReturnCode ReadFmtChunk(std::ifstream& wavFile, WaveFileData& wfd,
   }
 
   // Skip any extra bytes in the fmt chunk
-  // This should probably be a remainder of a dword so that we're mod-4
+  // Some valid files include additional fmt extension bytes; skip them.
   if (wfd.fmtChunk.size > bytesRead)
   {
     const int extraBytes = wfd.fmtChunk.size - bytesRead;
-    if (extraBytes >= 4)
-    {
-      std::cerr << "More than 4 extra bytes in fmt chunk." << std::endl;
-      return dsp::wav::LoadReturnCode::ERROR_INVALID_FILE;
-    }
     wavFile.ignore(extraBytes);
   }
 
@@ -291,13 +291,6 @@ dsp::wav::LoadReturnCode ReadDataChunk(std::ifstream& wavFile, WaveFileData& wfd
     std::cerr << "Error: Tried to read data chunk before fmt chunk." << std::endl;
     return dsp::wav::LoadReturnCode::ERROR_INVALID_FILE;
   }
-  if (wfd.fmtChunk.audioFormat == AUDIO_FORMAT_EXTENSIBLE
-      && !wfd.factChunk.valid) // fact chunk must come before data chunk
-  {
-    std::cerr << "Error: Tried to read data chunk before fact chunk for extensible format WAVE file." << std::endl;
-    return dsp::wav::LoadReturnCode::ERROR_INVALID_FILE;
-  }
-
   // Size of the data chunk, in bits.
   wfd.dataChunk.size = ReadInt(wavFile);
   std::vector<float> loaded;
