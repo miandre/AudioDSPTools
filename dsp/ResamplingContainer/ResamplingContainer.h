@@ -44,7 +44,6 @@ iPlug 2 includes the following 3rd party libraries (see each license info):
 
 #pragma once
 
-#include <iostream>
 #include <functional>
 #include <cmath>
 
@@ -191,8 +190,6 @@ public:
     const auto populated2 = mResampler2->PopBlock(outputs, nFrames);
     if (populated2 < nFrames)
     {
-      std::cerr << "Did not yield enough samples (" << populated2 << ") to provide the required output buffer (expected"
-                << nFrames << ")! Filling with last sample..." << std::endl;
       for (int c = 0; c < NCHANS; c++)
       {
         const T lastSample = populated2 > 0 ? outputs[c][populated2 - 1] : 0.0;
