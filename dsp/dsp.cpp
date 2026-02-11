@@ -61,7 +61,7 @@ void dsp::DSP::_PrepareBuffers(const size_t numChannels, const size_t numFrames)
   const size_t oldChannels = this->_GetNumChannels();
 
   const bool resizeChannels = oldChannels != numChannels;
-  const bool resizeFrames = resizeChannels || (oldFrames != numFrames);
+  const bool resizeFrames = resizeChannels || (oldFrames < numFrames);
   if (resizeChannels)
   {
     this->mOutputs.resize(numChannels);
