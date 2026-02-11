@@ -44,7 +44,6 @@ iPlug 2 includes the following 3rd party libraries (see each license info):
 
 #pragma once
 
-#include <functional>
 #include <cmath>
 
 // #include "IPlugPlatform.h"
@@ -84,7 +83,6 @@ template <typename T = double, int NCHANS = 2, size_t A = 12>
 class ResamplingContainer
 {
 public:
-  using BlockProcessFunc = std::function<void(T**, T**, int)>;
   using LanczosResampler = LanczosResampler<T, NCHANS, A>;
 
   // :param renderingSampleRate: The sample rate required by the code to be encapsulated.
@@ -162,9 +160,9 @@ public:
    * @param inputs Two-dimensional array containing the non-interleaved input buffers of audio samples for all channels
    * @param outputs Two-dimensional array for audio output (non-interleaved).
    * @param nFrames The block size for this block: number of samples per channel.
-   * @param func The function that processes the audio sample at the higher sampling rate. NOTE: std::function can call
-   * malloc if you pass in captures */
-  void ProcessBlock(T** inputs, T** outputs, int nFrames, BlockProcessFunc func)
+   * @param func The function that processes the audio sample at the higher sampling rate. */
+  template <typename F>
+  void ProcessBlock(T** inputs, T** outputs, int nFrames, F&& func)
   {
     mResampler1->PushBlock(inputs, nFrames);
     // This is the most samples the encapsualted context might get. Sometimes it'll get fewer.
