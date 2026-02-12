@@ -94,6 +94,14 @@ public:
   void SetParams(const TriggerParams& params) { this->mParams = params; };
   void SetSampleRate(const double sampleRate) { this->mSampleRate = sampleRate; }
   std::vector<std::vector<DSP_SAMPLE>> GetGainReductionDB() const { return this->mGainReductionDB; };
+  bool IsAttenuating(const double minReductionDB = 12.0) const
+  {
+    const double thresholdDB = -std::abs(minReductionDB);
+    for (const auto& channelReduction : this->mLastGainReductionDB)
+      if (channelReduction <= thresholdDB)
+        return true;
+    return false;
+  }
 
   void AddListener(Gain* gain)
   {
