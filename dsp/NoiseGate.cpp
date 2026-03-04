@@ -8,7 +8,6 @@
 #include <algorithm> // std::clamp
 #include <cstring> // memcpy
 #include <cmath> // pow
-#include <sstream>
 
 #include "NoiseGate.h"
 
@@ -152,25 +151,30 @@ DSP_SAMPLE** dsp::noise_gate::Gain::Process(DSP_SAMPLE** inputs, const size_t nu
   // trigger. Could use listeners...
   this->_PrepareBuffers(numChannels, numFrames);
 
-  if (this->mGainReductionDB.size() != numChannels)
+  bool gainReductionShapeMatches = (this->mGainReductionDB.size() == numChannels);
+  if (gainReductionShapeMatches)
   {
-    std::stringstream ss;
-    ss << "Gain module expected to operate on " << this->mGainReductionDB.size() << "channels, but " << numChannels
-       << " were provided.";
-    throw std::runtime_error(ss.str());
+    for (size_t c = 0; c < numChannels; ++c)
+    {
+      if (this->mGainReductionDB[c].size() != numFrames)
+      {
+        gainReductionShapeMatches = false;
+        break;
+      }
+    }
   }
-  if ((this->mGainReductionDB.size() == 0) && (numFrames > 0))
+
+  if (!gainReductionShapeMatches)
   {
-    std::stringstream ss;
-    ss << "No channels expected by gain module, yet " << numFrames << " were provided?";
-    throw std::runtime_error(ss.str());
-  }
-  else if (this->mGainReductionDB[0].size() != numFrames)
-  {
-    std::stringstream ss;
-    ss << "Gain module expected to operate on " << this->mGainReductionDB[0].size() << "frames, but " << numFrames
-       << " were provided.";
-    throw std::runtime_error(ss.str());
+    // Never throw in the audio callback; bypass gate gain for this block.
+    for (size_t c = 0; c < numChannels; ++c)
+    {
+      if (inputs != nullptr && inputs[c] != nullptr)
+        memcpy(this->mOutputs[c].data(), inputs[c], numFrames * sizeof(DSP_SAMPLE));
+      else
+        std::fill_n(this->mOutputs[c].begin(), numFrames, 0.0);
+    }
+    return this->_GetPointers();
   }
 
   // Apply gain!
