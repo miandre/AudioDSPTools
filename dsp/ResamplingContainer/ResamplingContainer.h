@@ -56,6 +56,8 @@ iPlug 2 includes the following 3rd party libraries (see each license info):
 namespace dsp
 {
 
+constexpr int kDefaultResamplingContainerBlockSize = 64;
+
 /** A multi-channel real-time resampling container that can be used to resample
  * audio processing to a specified sample rate for the situation where you have
  * some arbitary DSP code that requires a specific sample rate, then back to
@@ -97,7 +99,7 @@ public:
   // :param inputSampleRate: The external sample rate interacting with this object.
   // :param blockSize: The largest block size that will be given to this class to process until Reset()  is called
   //     again.
-  void Reset(double inputSampleRate, int blockSize = DEFAULT_BLOCK_SIZE)
+  void Reset(double inputSampleRate, int blockSize = kDefaultResamplingContainerBlockSize)
   {
     if (mInputSampleRate == inputSampleRate && mMaxBlockSize == blockSize)
     {
